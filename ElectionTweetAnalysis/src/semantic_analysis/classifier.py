@@ -1,6 +1,6 @@
 '''
 classifier.py
-@author: Vandana Bachani
+@author: Bolun Huang
 Classification of campaigners, supporters and neutral users from Election Tweets
 '''
 from sklearn.feature_extraction.text import TfidfVectorizer

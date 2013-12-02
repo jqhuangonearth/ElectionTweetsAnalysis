@@ -38,25 +38,10 @@ class Semantic_Based_Classifier:
 		self.test_ids = [self.data_ids[int(num_train+i)].strip() for i in range(int(num_ids - num_train))]
 		print self.test_ids
 		
-		self.features = ["tcot",
-						 "syria",
-						 "p2",
-						 "bengahazi",
-						 "obama",
-						 "teaparty",
-						 "uniteblue",
-						 "gop",
-						 "obamacare",
-						 "tlot",
-						 "pjnet",
-						 "lnyhbt",
-						 "tgdn",
-						 "israel",
-						 "ccot",
-						 "romneyryan2012",
-						 "nra",
-						 "nsa",
-						 "irs"]
+		self.features = ["tcot", "syria", "p2", "bengahazi", "obama",
+            			 "teaparty", "uniteblue", "gop", "obamacare",
+            			 "tlot", "pjnet", "lnyhbt", "tgdn", "israel",
+            			 "ccot", "romney", "nra", "nsa", "irs"]
 		
 		self.connection = Connection(self.DB_SERVER, self.DB_PORT)
 		self.db = self.connection[self.DB_NAME]

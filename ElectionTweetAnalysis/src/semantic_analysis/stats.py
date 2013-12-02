@@ -16,45 +16,49 @@ class histogram:
         self._count_pos = 0.0
         self._count_neg = 0.0
         self._var = 0
+        self._zero = 0
         
     def add(self, val):
-        if self._count == 0:
-            self._max = val
-            self._min = val
-            self._mean = val
-            self._count += 1
-            self._var = 0.0
-            if val < 0:
-                self._mean_neg = val
-                self._count_neg = 1
-            elif val > 0:
-                self._mean_pos = val
-                self._count_pos = 1
+        if val == None or not (val > 0.01 or val < -0.01):
+            self._zero += 1
+            pass
         else:
-            if val > self._max:
+            if self._count == 0:
                 self._max = val
-            if val < self._min:
                 self._min = val
-            self._count += 1
-            old_mean = self._mean
-            self._mean += (val - self._mean) / float(self._count)
-            self._var += (val - old_mean) * (val - self._mean)
-            if val < 0:
-                if self._count_neg == 0:
+                self._mean = val
+                self._count += 1
+                self._var = 0.0
+                if val < 0:
                     self._mean_neg = val
                     self._count_neg = 1
-                else:
-                    self._count_neg += 1
-                    self._mean_neg += (val - self._mean_neg) / float(self._count_neg)
-            elif val > 0:
-                if self._count_pos == 0:
+                elif val > 0:
                     self._mean_pos = val
                     self._count_pos = 1
-                else:
-                    self._count_pos += 1
-                    self._mean_pos += (val - self._mean_pos) / float(self._count_pos)
-
-        self.bucket.append(val)
+            else:
+                if val > self._max:
+                    self._max = val
+                if val < self._min:
+                    self._min = val
+                self._count += 1
+                old_mean = self._mean
+                self._mean += (val - self._mean) / float(self._count)
+                self._var += (val - old_mean) * (val - self._mean)
+                if val < 0:
+                    if self._count_neg == 0:
+                        self._mean_neg = val
+                        self._count_neg = 1
+                    else:
+                        self._count_neg += 1
+                        self._mean_neg += (val - self._mean_neg) / float(self._count_neg)
+                elif val > 0:
+                    if self._count_pos == 0:
+                        self._mean_pos = val
+                        self._count_pos = 1
+                    else:
+                        self._count_pos += 1
+                        self._mean_pos += (val - self._mean_pos) / float(self._count_pos)
+            self.bucket.append(val)
     
     def min(self):
         return self._min
@@ -80,6 +84,9 @@ class histogram:
     def count_neg(self):
         return self._count_neg
 
+    def count_zero(self):
+        return self._zero
+
     def var(self):
         if self._count < 2:
             return 0.0
@@ -103,7 +110,7 @@ class histogram:
                 distribution[int(math.floor((e - self._min)/beam_width))] += 1
         return (index, distribution)
         
-    def draw_histogram(self, bnum,filename):
+    def draw_histogram(self, bnum, filename):
         (index, distribution) = self.histogram(bnum)
         fig = p.figure()
         ax = fig.add_subplot(1,1,1)
@@ -118,12 +125,15 @@ class histogram:
         p.savefig(filename)
         return (index, distribution)
     
-    """ In this function, we have fixed number of bars """
+    
     def histogram_fixed(self, filename):
+        """
+        In this function, we have fixed number of bars
+        """
         index = []
         for i in range(53):
             index.append(-0.52+i*0.02)
-        print index
+        #print index
         distribution = [0]*53
         for e in self.bucket:
             if e > 0.5:
@@ -146,6 +156,46 @@ class histogram:
         ax.set_xticklabels(x_stick)
         p.savefig(filename)
         return (index, distribution)
+    
+    def histogram_2(self):
+        """
+        We generate a distribution from -1 to 1 with the interval of 0.05
+        there are 42 bars in the distribution
+        """
+        distribution = [0]*42
+        for e in self.bucket:
+            if e < -1.0:
+                distribution[0] += 1
+            elif e >= 1.0:
+                distribution[41] += 1
+            else:
+                distribution[int(1+math.floor((e + 1.0)/0.05))] += 1
+        sumd = math.fsum(distribution)
+        if sumd > 0:
+            for i in range(len(distribution)):
+                distribution[i] = distribution[i]/sumd
+        return distribution
+    
+    def histogram_2_normalized(self):
+        """
+        We generate a distribution from -1 to 1 with the interval of 0.05
+        there are 42 bars in the distribution
+        The value is normalized using [x_i -E(X)]/sigma(X)
+        """
+        distribution = [0]*42
+        for e in self.bucket:
+            if e < -1.0:
+                distribution[0] += 1
+            elif e >= 1.0:
+                distribution[41] += 1
+            else:
+                distribution[int(1+math.floor((e + 1.0)/0.05))] += 1
+        for i in range(len(distribution)):
+            distribution[i] = (distribution[i] - self.avg())/self.std()
+        return distribution
+    
+    
+        
     
 """        
 def main():
