@@ -1,6 +1,8 @@
 """
 This program implements Hyperlink-Induced Topic Search in social graph
 mixed with sentiment score for a particular topic
+This method adjusted the sentiscore at the final step with auth(U)
+and sentihits_adjusted.py is adjusting scores in each steps
 @author: Bolun hbl080212(at)neo(dot)tamu(dot)edu
 @reference: http://code.google.com/p/python-graph/issues/detail?id=113
 @copyright: http://code.google.com/p/python-graph/issues/detail?id=113

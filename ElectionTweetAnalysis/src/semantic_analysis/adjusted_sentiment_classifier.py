@@ -1,3 +1,7 @@
+"""
+@author: Bolun Huang
+"""
+
 import cjson   
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import GaussianNB
@@ -11,21 +15,17 @@ class Semantic_Based_Classifier:
     DB_PORT = 27017
     DB_NAME = "electiontweetsanalysis"
     COLLECTION_UV = "user_vector_campainers"
-    def __init__(self, train_percent):
-        f = open("results/adjusted_sentiscore_vector_1.0.json", "r")
+    def __init__(self, alpha = 0.8):
+        self.alpha = alpha
+        f = open("results/adjusted_sentiscore_vector_%.1f.json" %self.alpha, "r")
         self.vector = cjson.decode(f.readline())
         f.close()
 
         self.data_ids = self.vector.keys()
         random.shuffle(self.data_ids)
 
-        num_ids = len(self.data_ids) * 1
-        num_train = (train_percent/100.0) * num_ids
-        self.train_ids = [self.data_ids[i].strip() for i in range(int(num_train))]
-        print len(self.train_ids)
-        #print self.train_ids
-        self.test_ids = [self.data_ids[int(num_train+i)].strip() for i in range(int(num_ids - num_train))]
-        print len(self.test_ids)
+        self.train_ids = []
+        self.test_ids = []
         
         self.features = ["tcot", "syria", "p2", "bengahazi", "obama",
                          "teaparty", "uniteblue", "gop", "obamacare",
@@ -48,7 +48,7 @@ class Semantic_Based_Classifier:
                 it = self.db[self.COLLECTION_UV].find({"screen_name" : user})
                 for i in it:
                     y_tr.append(i['class'])
-            print len(X_tr), len(y_tr)
+            #print len(X_tr), len(y_tr)
 
         #test data
         X_te, y_te = [], []
@@ -63,7 +63,7 @@ class Semantic_Based_Classifier:
             for i in it:
                 y_te.append(i['class'])
         
-        print len(X_te), len(y_te)
+        #print len(X_te), len(y_te)
 
         if test_only:
             return {'train': {'X': self.train_data['X'], 'y': self.train_data['y']}, 'test': {'X': X_te, 'y': y_te}}
@@ -80,26 +80,23 @@ class Semantic_Based_Classifier:
         ### decision tree model
         self.clf = tree.DecisionTreeClassifier()
         self.clf = self.clf.fit(self.train_data['X'], self.train_data['y'])
-        out = tree.export_graphviz(self.clf, out_file='data/decision_tree_adjusted_1.0.dot')
+        out = tree.export_graphviz(self.clf, out_file='data/decision_tree_adjusted_%.1f.dot' %self.alpha, feature_names=self.features)
         out.close()
         ### naive bayes model
         self.clf_2 = GaussianNB()
         self.clf_2.fit(self.train_data['X'], self.train_data['y'])
     
     def prediction(self):
-        print "**************decision tree model*****************"
+        print "*******decision tree model********"
         y_predicted = self.clf.predict(self.test_data['X'])
         #y_predicted_prob = self.clf.predict_proba(self.test_data['X'])
-        print len(y_predicted), len(self.test_data['y'])
+        #print len(y_predicted), len(self.test_data['y'])
         score = metrics.f1_score(self.test_data['y'], y_predicted)
         print "f1-score:   %0.3f" % score
-
-        for i in range(0, len(self.test_data['y'])):
-            print self.test_data['y'][i],
-        print '\t'
-        for i in range(0, len(y_predicted)):
-            print y_predicted[i],
-        print '\t'
+        #for i in range(0, len(self.test_data['y'])):
+        #    print self.test_data['y'][i],
+        #for i in range(0, len(y_predicted)):
+        #    print y_predicted[i],
         print "classification report:"
         print metrics.classification_report(self.test_data['y'], y_predicted, target_names=['democrat','republican'])
         #print metrics.classification_report(self.test_data['y'], y_predicted, target_names=['other', 'journalist',''])
@@ -126,18 +123,31 @@ class Semantic_Based_Classifier:
             variance_vec = self.calculate_variance(X_tr)
             self.tweet_variance.append(variance_vec)
 
-    def cross_validate(self):
+    def cross_validate(self, fold = 10):
+        """
+        Implement cross validation given the number of folds
+        It first shuffle the ids and partition the id according
+        to the given fold number
+        @param fold: number of fold
+        """
+        random.shuffle(self.data_ids)
         data_size = len(self.data_ids)
-        train_size = data_size/5;
-        for j in range(5):
-            start_idx = j*train_size
-            end_idx = start_idx+train_size if start_idx+train_size < data_size else data_size
-            #print "Train Data Start:",start_idx,"End",end_idx
-            self.train_ids = [self.data_ids[i].strip() for i in range(start_idx,end_idx)]
-            #print self.train_ids
-            self.test_ids = [self.data_ids[i].strip() for i in range(0,start_idx)]
-            if end_idx < data_size:
-                self.test_ids.extend([self.data_ids[i].strip() for i in range(end_idx,data_size)])
+        trunk_size = data_size/fold;
+        for test in range(fold):
+            self.train_ids = []
+            self.test_ids = []
+            # plitting the data
+            for j in range(fold):
+                if j == test and j != fold - 1:
+                    self.test_ids.extend(self.data_ids[j*trunk_size:(j+1)*trunk_size])
+                elif j == test and j == fold - 1:
+                    self.test_ids.extend(self.data_ids[j*trunk_size:len(self.data_ids)])
+                elif j != test and j != fold - 1:
+                    self.train_ids.extend(self.data_ids[j*trunk_size:(j+1)*trunk_size])
+                elif j != test and j == fold - 1:
+                    self.train_ids.extend(self.data_ids[j*trunk_size:len(self.data_ids)])
+            
+            print "train:", len(self.train_ids), " test:", len(self.test_ids)
             #print self.test_ids
             self.initialize_data()
             self.train()
@@ -151,11 +161,20 @@ class Semantic_Based_Classifier:
 
 
 def main():
-    uc = Semantic_Based_Classifier(75)
-    uc.initialize_data()
-    uc.train()
-    uc.prediction()
-    #uc.cross_validate()
+    alphas = [0.1, 0.5, 0.8, 1.0]
+    folds = [4, 5, 10]
+    for a in alphas:
+        uc = Semantic_Based_Classifier(alpha = a)
+        print "*****************************************************"
+        print "CROSS VALIDATION RESULT for alpha value = %.1f" %a
+        #uc.initialize_data()
+        #uc.train()
+        #uc.prediction()
+        for f in folds:
+            print "%d FOLD CROSS VALIDATION.........................." %f
+            uc.cross_validate(fold = f)
+            print ""
+        print "\t\t"
 
 if __name__ == "__main__":
     main()

@@ -7,7 +7,7 @@ import cjson
 import httplib2
 import urllib
 import re
-import stats
+from stats import stats
 import sys
 
 class topic_semantic_check:
