@@ -26,12 +26,57 @@ connection = Connection(DB_SERVER, DB_PORT)
 db = connection[DB_NAME]
 
 # TODO: subject to future change
-keywords = ["tcot", "syria", "p2", "bengahazi", "obama",
+"""keywords = ["tcot", "syria", "p2", "bengahazi", "obama",
             "teaparty", "uniteblue", "gop", "obamacare",
             "tlot", "pjnet", "lnyhbt", "tgdn", "israel",
             "ccot", "romney", "nra", "nsa", "irs"]
+"""
+keywords = []
 
+def get_keyword_vector():
+    ff = open("results/statistics_hashtag_sentiscores_78.csv","r")
+    keywords_feature_vector = {}
+    features = []
+    line = ff.readline()
+    line = line.split(";")
+    for f in line[1:]:
+        features.append(f.rstrip())
 
+    for line in ff:
+        line = line.split(";")
+        vals = line[1:]
+        keywords_feature_vector.update({line[0] : {}})
+        keywords_feature_vector[line[0]].update({features[i] : float(vals[i]) for i in range(len(vals))})
+    ff.close()
+    
+    """sorted by sentiscore_diff"""
+    #keywords_feature_vector_list = sorted(keywords_feature_vector.iteritems(), key = lambda x : x[1]["sc_min_max_diff"], reverse = True)
+    """sorted by sentiword_diff"""
+    keywords_feature_vector_list = sorted(keywords_feature_vector.iteritems(), key = lambda x : x[1]["sw_min_max_diff"], reverse = True)
+    #keywords = [kw[0] for kw in keywords_feature_vector_list[0:len(keywords_feature_vector_list)/2]]
+    #keywords = [kw[0] for kw in keywords_feature_vector_list[len(keywords_feature_vector_list)/2:len(keywords_feature_vector_list)]]
+    """divide into top10, mid10 and last10"""
+    """top10"""
+    #keywords = [kw[0] for kw in keywords_feature_vector_list[0:10]]
+    """middle10"""
+    #keywords = [kw[0] for kw in keywords_feature_vector_list[len(keywords_feature_vector_list)/2:len(keywords_feature_vector_list)/2+10]]
+    """last10"""
+    #keywords = [kw[0] for kw in keywords_feature_vector_list[len(keywords_feature_vector_list)-10:len(keywords_feature_vector_list)]]
+    
+    """top5"""
+    #keywords = [kw[0] for kw in keywords_feature_vector_list[0:5]]
+    """middle5"""
+    #keywords = [kw[0] for kw in keywords_feature_vector_list[len(keywords_feature_vector_list)/2:len(keywords_feature_vector_list)/2+5]]
+    """last5"""
+    keywords = [kw[0] for kw in keywords_feature_vector_list[len(keywords_feature_vector_list)-5:len(keywords_feature_vector_list)]]
+    """
+    f = open("results/features_last5.json","w")
+    json.dump(keywords, f)
+    f.close()
+    exit(0)
+    """
+    return keywords
+    
 def sentihits(graph, root_set=[], keyword = "", max_iterations=100, min_delta=0.0001):
     """
     Compute and return the PageRank in an directed graph. We assume that the
@@ -99,7 +144,7 @@ def sentihits(graph, root_set=[], keyword = "", max_iterations=100, min_delta=0.
             break
     
     adjusted_senti_score = {}
-    alpha = 1.0 # branching factor
+    alpha = 0.91 # branching factor
     # adjust the scores in the base_senti_score
     for user in base_senti_score:
         new_senti_score = 0.0
@@ -163,8 +208,9 @@ def draw_graph(G):
 
 
 class hits_test():
-    def __init__(self):
+    def __init__(self, keyword_list = []):
         self.G = nx.DiGraph() # internal graph
+        self.keyword_list = keyword_list
         
     def construct_graph(self, node_list, edge_list):
         """
@@ -178,28 +224,41 @@ class hits_test():
             self.G.add_node(node)
         for edge in edge_list:
             self.G.add_edge(edge[0], edge[1])
+    
+    def find_lone_node(self):
+        f = open("data/lonely_nodes_list.txt","w")
+        f.write("#to be removed since they doesn't have connections in this local graph")
+        for n in self.G:
+            if self.G.degree(n) == 0:
+                #print n
+                f.write(n+"\n")
+        f.close()
         
     def run_sentihits(self):
         return sentihits(self.G)
     
     def test_sentihits(self):
         adjusted_score_vector = {}
-        for keyword in keywords:
+        
+        for keyword in self.keyword_list:
             user_senti_score_dic = sentihits(self.G, keyword = keyword) # run sentihits to get adjusted sentiment score
             for user in user_senti_score_dic:
                 if user not in adjusted_score_vector:
                     adjusted_score_vector.update({user : {keyword : user_senti_score_dic[user]}})
                 else:
                     adjusted_score_vector[user].update({keyword : user_senti_score_dic[user]})
-        f = open("results/adjusted_sentiscore_vector_1.0.json","w")
+        f = open("results/sentiscore_vectors_2/5features/adjusted_sentiscore_vector_0.91_last5.json","w")
         json.dump(adjusted_score_vector, f)
         f.close()
         
 def main():
     #pre_process()
     #process_user_graph()
-    #exit(0)
-    ht = hits_test()
+    keywords = get_keyword_vector()
+    print keywords
+    print len(keywords)
+
+    ht = hits_test(keyword_list = keywords)
 
     fg = open("../social_analysis/user_graph/user_graph_393_screen_name_2.txt", "r")
     flag = 0
@@ -226,7 +285,9 @@ def main():
     print len(node_list), len(edge_list)
     ht.construct_graph(node_list, edge_list)
     print len(ht.G.nodes()), len(ht.G.edges())
-
+    
+    ht.find_lone_node()
+    exit(0)
     ht.test_sentihits()
     #auth_score = hub_auth[1]
     #f = open("../social_graph/authorities.json","w")

@@ -37,8 +37,9 @@ class social:
             count += 1
         f.close()
         return user_dic
-        
-    def read_user_friends(self, filename):
+    
+    @staticmethod
+    def read_user_friends(filename):
         user_friends = {}
         f = open(filename, "r")
         for line in f:
@@ -51,7 +52,7 @@ class social:
         self.user_dic = self.read_user_dic("../semantic_analysis/user_vector/user_vector.json")
         self.user_friends = self.read_user_friends("../twitter_crawler/social_graph/user_friends.json")
         self.user_followers = self.read_user_friends("../twitter_crawler/social_graph/user_followers.json")
-        
+        exit(0)
         f = open("../semantic_analysis/data/labelled_id_name_map_393.json", "r")
         id_label_map = cjson.decode(f.readline())
         f.close()

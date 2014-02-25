@@ -9,6 +9,7 @@ from sklearn import tree
 from sklearn import metrics
 from pymongo import Connection
 import random
+import numpy as np
 
 class Semantic_Based_Classifier:
     DB_SERVER = "localhost"
@@ -17,7 +18,7 @@ class Semantic_Based_Classifier:
     COLLECTION_UV = "user_vector_campainers"
     def __init__(self, alpha = 0.8):
         self.alpha = alpha
-        f = open("results/adjusted_sentiscore_vector_%.1f.json" %self.alpha, "r")
+        f = open("results/sentiscore_vectors_2/5features/adjusted_sentiscore_vector_%.2f_top5.json" %self.alpha, "r")
         self.vector = cjson.decode(f.readline())
         f.close()
 
@@ -26,11 +27,16 @@ class Semantic_Based_Classifier:
 
         self.train_ids = []
         self.test_ids = []
-        
+        """
         self.features = ["tcot", "syria", "p2", "bengahazi", "obama",
                          "teaparty", "uniteblue", "gop", "obamacare",
                          "tlot", "pjnet", "lnyhbt", "tgdn", "israel",
-                         "ccot", "romney", "nra", "nsa", "irs"]
+                         "ccot", "romney", "nra", "nsa", "irs"]"""
+        # TODO: load different set of features
+        f = open("results/features_top5.json","r")
+        self.features = cjson.decode(f.readline())
+        print self.features
+        f.close()
         self.connection = Connection(self.DB_SERVER, self.DB_PORT)
         self.db = self.connection[self.DB_NAME]
     
@@ -89,17 +95,24 @@ class Semantic_Based_Classifier:
     def prediction(self):
         print "*******decision tree model********"
         y_predicted = self.clf.predict(self.test_data['X'])
+        #print self.clf.score(self.test_data['X'], self.test_data['y'])
+        
         #y_predicted_prob = self.clf.predict_proba(self.test_data['X'])
         #print len(y_predicted), len(self.test_data['y'])
-        score = metrics.f1_score(self.test_data['y'], y_predicted)
-        print "f1-score:   %0.3f" % score
+        print np.array(self.test_data['y'])
+        print np.array(y_predicted)
+        f_score = metrics.f1_score(self.test_data['y'], y_predicted)
+        accuracy = metrics.accuracy_score(self.test_data['y'], y_predicted)
+        print "f1-score:   %0.3f" % f_score
+        print "accuracy:   %0.3f" % accuracy
         #for i in range(0, len(self.test_data['y'])):
         #    print self.test_data['y'][i],
         #for i in range(0, len(y_predicted)):
         #    print y_predicted[i],
-        print "classification report:"
-        print metrics.classification_report(self.test_data['y'], y_predicted, target_names=['democrat','republican'])
+        #print "classification report:"
+        #print metrics.classification_report(self.test_data['y'], y_predicted, target_names=['democrat','republican'])
         #print metrics.classification_report(self.test_data['y'], y_predicted, target_names=['other', 'journalist',''])
+        return [f_score, accuracy]
 
     def get_text_features(self):
         #user_vectors_train = []
@@ -130,6 +143,8 @@ class Semantic_Based_Classifier:
         to the given fold number
         @param fold: number of fold
         """
+        f_scores = []
+        accuracies = []
         random.shuffle(self.data_ids)
         data_size = len(self.data_ids)
         trunk_size = data_size/fold;
@@ -151,7 +166,10 @@ class Semantic_Based_Classifier:
             #print self.test_ids
             self.initialize_data()
             self.train()
-            self.prediction();    
+            result = self.prediction()
+            f_scores.append(result[0])
+            accuracies.append(result[1])
+        return [sum(f_scores)/float(len(f_scores)), sum(accuracies)/float(len(accuracies))]
 
     def test(self,ids_to_test):
         self.test_ids = ids_to_test
@@ -161,20 +179,60 @@ class Semantic_Based_Classifier:
 
 
 def main():
-    alphas = [0.1, 0.5, 0.8, 1.0]
+    #alphas = [0.1, 0.5, 0.8, 0.9, 1.0]
+    #alphas = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    alphas = [0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98, 0.99]
+
     folds = [4, 5, 10]
+    Iter = 10 # conduct Iter times cross validation
+    f_scores = []
+    accuracies = []
     for a in alphas:
         uc = Semantic_Based_Classifier(alpha = a)
         print "*****************************************************"
-        print "CROSS VALIDATION RESULT for alpha value = %.1f" %a
+        print "CROSS VALIDATION RESULT for alpha value = %.2f" %a
         #uc.initialize_data()
         #uc.train()
         #uc.prediction()
+        tuple_f = []
+        tuple_s = []
         for f in folds:
+            score = []
+            accuracy = []
             print "%d FOLD CROSS VALIDATION.........................." %f
-            uc.cross_validate(fold = f)
+            for i in range(Iter):
+                result = uc.cross_validate(fold = f)
+                score.append(result[0])
+                accuracy.append(result[1])
             print ""
+            tuple_f.append(sum(score)/float(len(score)))
+            tuple_s.append(sum(accuracy)/float(len(accuracy)))
+        f_scores.append(tuple_f)
+        accuracies.append(tuple_s)
         print "\t\t"
+
+    f1 = open("results/results_fscore_accuracy_dec10/f_scores_top5_0.91-0.99.csv","w")
+    f2 = open("results/results_fscore_accuracy_dec10/accuracy_top5_0.91-0.99.csv","w")
+    f1.write("alpha,4fold,5fold,10fold\n")
+    f2.write("alpha,4fold,5fold,10fold\n")
+    for i in range(len(alphas)):
+        s = str(alphas[i]) + ","
+        for j in range(len(f_scores[i])):
+            if j != len(f_scores[i]) - 1:
+                s = s + str(f_scores[i][j]) + ","
+            else:
+                s = s + str(f_scores[i][j]) + "\n"
+        f1.write(s)
+        s = ""
+        s = str(alphas[i]) + ","
+        for j in range(len(accuracies[i])):
+            if j != len(accuracies[i]) - 1:
+                s = s + str(accuracies[i][j]) + ","
+            else:
+                s = s + str(accuracies[i][j]) + "\n"
+        f2.write(s)
+    f1.close()
+    f2.close()
 
 if __name__ == "__main__":
     main()

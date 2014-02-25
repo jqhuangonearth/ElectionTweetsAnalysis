@@ -6,7 +6,6 @@ from pymongo import Connection
 import re
 import nltk
 import cjson
-import math
 from pylab import rcParams
 import matplotlib.pyplot as plt
 import stats

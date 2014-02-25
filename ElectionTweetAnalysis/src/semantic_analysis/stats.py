@@ -3,6 +3,8 @@
 """
 import pylab as p
 import math
+import numpy
+
 
 class histogram:
     def __init__(self):
@@ -17,9 +19,20 @@ class histogram:
         self._count_neg = 0.0
         self._var = 0
         self._zero = 0
-        
+    
+    @staticmethod
+    def cosine_distance(u, v):
+        """
+        Returns the cosine of the angle between vectors v and u. This is equal to
+        u.v / |u||v|.
+        """
+        return numpy.dot(u, v) / (math.sqrt(numpy.dot(u, u)) * math.sqrt(numpy.dot(v, v)))
+    
     def add(self, val):
-        if val == None or not (val > 0.01 or val < -0.01):
+        """ uncomment this condition if you need filtering """
+        #if val == None or not (val > 0.01 or val < -0.01):
+        #if False:
+        if not (val > 0 or val < 0):
             self._zero += 1
             pass
         else:
@@ -95,6 +108,7 @@ class histogram:
     def std(self):
         return self.var() ** 0.5
 
+    
     
     def histogram(self, bnum):
         beam_num = bnum

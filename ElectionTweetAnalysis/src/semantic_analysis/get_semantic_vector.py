@@ -79,6 +79,25 @@ class topic_semantic_check:
                 words.append(text1[i])
         return words
     
+    def process_sentence_2(self, text):
+        text1 = ""
+        try:
+            # to lower case
+            text1 = text.lower()
+            # remove url
+            text1 = re.sub(r'http:[\\/.a-z0-9]+\s?', '', text1)
+            text1 = re.sub(r'https:[\\/.a-z0-9]+\s?', '', text1)
+            # rmove mentioned user names
+            text1 = re.sub(r'(@\w+\s?)|(@\s+)', '', text1) 
+            # remove special characters
+            text1 = re.sub(r'[\#\-\+\*\`\.\;\:\"\<\>\[\]\{\}\|\~\_\=\^\&\(\)]', '', text1) 
+            # remove retweet tag
+            #text1 = re.sub(r'rt\s?', '', text1)
+        except:
+            print text1
+            pass
+        return text1
+    
     def send_query(self, text):
         query = 'http://access.alchemyapi.com/calls/text/TextGetTextSentiment?apikey={0}&text={1}&outputMode=json'.format(self.APIKEY, urllib.quote_plus(text.encode('utf8')))
         (header, context) = self.http.request(query, 'GET')
@@ -88,7 +107,7 @@ class topic_semantic_check:
                 if result['docSentiment']['type'] == 'neutral':
                     #print "neutral"
                     return 0.0
-                elif float(result['docSentiment']['score']) > 0.01 or float(result['docSentiment']['score']) < -0.01:
+                elif float(result['docSentiment']['score']) > 0.00 or float(result['docSentiment']['score']) < -0.00:
                     #print result['docSentiment']['score']
                     return float(result['docSentiment']['score'])
                 else:
@@ -98,33 +117,34 @@ class topic_semantic_check:
                 if result["statusInfo"] == 'daily-transaction-limit-exceeded':
                     print "need to sleep for 86399 sec"
                     time.sleep(86399)
+                    return self.send_query(text)
                     
                     
                 #error:  {'status': 'ERROR', 'statusInfo': 'daily-transaction-limit-exceeded'}
         else:
             print "header error: ", header
             pass
-        return None
+        return 0.0
         
     def check(self):
         count = 0
         self.read_user_vector("user_vector/user_vector.json")
         self.user_list = self.get_user_list("data/labelled_user_new.txt")
-        self.topic_list = self.get_topics()
         for user in self.user_vector:
             #user_semantics_topics = {self.semantic_topics[i] : 0.0 for i in range(len(self.semantic_topics))} # semantic dict
             #user_semantics_counts = {self.semantic_topics[i] : 0.0 for i in range(len(self.semantic_topics))} # semantic dict for count
             print "processing %s..." %user
             for i in range(len(self.user_vector[user]["tweets"])):
                 tweet = self.user_vector[user]["tweets"][i]
-                words = self.process_sentence(tweet["text"])
-                score = self.send_query(" ".join(words))
+                words = self.process_sentence_2(tweet["text"])
+                score = self.send_query(words)
+                #score = self.send_query(" ".join(words))
                 count += 1
                 #print self.send_query(tweet["text"]), tweet["text"]
-                tweet.update({"sentiment_score" : score})
+                tweet.update({"sentiment_score_whole_sentence" : score})
                 self.user_vector[user]["tweets"][i] = tweet
             print "done processing %s.. %d.." %(user, count)
-        f = open("user_vector/user_vector_new.json","w")
+        f = open("user_vector/user_vector_new_whole_sentence.json","w")
         for user in self.user_vector:
             json.dump(self.user_vector[user], f)
         f.close()
@@ -139,12 +159,6 @@ class topic_semantic_check:
                 user_list.append(line[0])
         f.close()
         return user_list
-        
-    def get_topics(self):
-        return ["tcot", "syria", "p2", "bengahazi", "obama",
-                "teaparty", "uniteblue", "gop", "obamacare",
-                "tlot", "pjnet", "lnyhbt", "tgdn", "israel",
-                "ccot", "romneyryan2012", "nra", "nsa", "irs"]
         
 def main():
     mycheck = topic_semantic_check()
